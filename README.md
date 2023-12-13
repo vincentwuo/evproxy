@@ -98,18 +98,18 @@ Proxy implementation using the go standard package.
 func trafficShaper(dst, src net.Conn, buf []byte)
 
 func handle(conn net.Conn){
-	upstreamConn,_ := net.Dial(upstreamAddr)
+    upstreamConn,_ := net.Dial(upstreamAddr)
 	//use buffer from the buffer pool
 	//usually we allocate a 16KB buf for each read and write
-	//the problem is when the connection is idle, there is no way 
+    //the problem is when the connection is idle, there is no way
     //to reuse these bufs, which leads to non-trivial memory consumption
     //when the number of connections is large.
-	//i.e, 100k conncetion = 100k * (8k from 2 gorutines + 32KB buf) = 3.8GB  
+    //i.e, 100k conncetion = 100k * (8k from 2 gorutines + 32KB buf) = 3.8GB  
 	readBuf := pool.Get()
 	writeBuf := pool.Get()
 	for{
-		trafficShaper(upstreamConn, conn, readBuf)
-	    go trafficShaper(conn, upstreamConn, writeBuf)
+	    trafficShaper(upstreamConn, conn, readBuf)
+        go trafficShaper(conn, upstreamConn, writeBuf)
 	}
     pool.Put(readBuf)
     pool.Put(writeBuf)
