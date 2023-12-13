@@ -1,4 +1,4 @@
-package proxy
+package evproxy
 
 import (
 	"sync/atomic"
@@ -90,7 +90,7 @@ mainLoop:
 			continue mainLoop
 		}
 
-		if c.proxy == nil || !c.proxy.enable || ev.Type == engine.PROXY_CLOSE_EVENT {
+		if c.proxy == nil || !c.proxy.enable || ev.Type == engine.EV_TYPE_PROXY_CLOSE {
 			if ev.Flag == c.flag {
 				w.ClosePair(c)
 			}
@@ -106,16 +106,7 @@ mainLoop:
 					//set a write timeout
 					if c.proxy.writeTimeOut > 0 {
 						timeout := timeNowUnixNano + c.proxy.writeTimeOut.Nanoseconds()
-						timeOutTask := &engine.Task{
-							TimeStamp: timeout,
-							Event: engine.Event{
-								Type:      engine.TIMEOUT_EVENT,
-								TimeStamp: timeout,
-								Ident:     c.Fd,
-								Ev:        engine.ErrEvents,
-								Flag:      c.flag,
-							},
-						}
+						timeOutTask := w.triggerLater(c.Fd, engine.ErrEvents, c.flag, engine.EV_TYPE_TIMEOUT, timeout)
 						c.timeOutTask = timeOutTask
 						w.Timer.PushTaskAndTick(timeOutTask)
 					}
@@ -135,7 +126,7 @@ mainLoop:
 			if c.flag != ev.Flag {
 				continue
 			}
-			if ev.Type == engine.TIMEOUT_EVENT {
+			if ev.Type == engine.EV_TYPE_TIMEOUT {
 				if !c.ready {
 					//dial timeout
 					w.ClosePair(c)
@@ -162,16 +153,8 @@ mainLoop:
 					w.deleteTimeOutTask(c.PeerConn)
 
 					//push a peerconn read event in the next loop
-					w.Timer.PushTaskAndTick(&engine.Task{
-						TimeStamp: timeNowUnixNano,
-						Event: engine.Event{
-							Ident:     c.PeerConn.Fd,
-							Ev:        engine.InEventRaw,
-							Type:      2,
-							TimeStamp: timeNowUnixNano,
-							Flag:      c.PeerConn.flag,
-						},
-					})
+					w.triggerLater(c.PeerConn.Fd, engine.InEventRaw, c.PeerConn.flag, engine.EV_TYPE_TIMER_DELY, timeNowUnixNano)
+
 					if c.proxy.writeAfterDial != nil {
 						c.Buffer = w.bf.Get()
 						c.proxy.writeAfterDial(c)
@@ -339,16 +322,7 @@ func (w *Worker) handleReadEvent(ev engine.Event, timeNow time.Time, c *Conn) {
 					c.PeerConn.CurPos = 0
 					c.PeerConn.EndPos = cn
 					// util.Println("wn is", wn, "add to buff", cn)
-					w.Timer.PushTaskAndTick(&engine.Task{
-						TimeStamp: timeNowUnixNano,
-						Event: engine.Event{
-							Ident:     c.PeerConn.Fd,
-							Ev:        engine.OutEventRaw,
-							Type:      2,
-							TimeStamp: timeNowUnixNano,
-							Flag:      c.PeerConn.flag,
-						},
-					})
+					w.triggerLater(c.PeerConn.Fd, engine.OutEventRaw, c.PeerConn.flag, engine.EV_TYPE_TIMER_DELY, timeNowUnixNano)
 					return
 
 				}
@@ -363,16 +337,7 @@ func (w *Worker) handleReadEvent(ev engine.Event, timeNow time.Time, c *Conn) {
 				// util.Println("dely", resrv.Delay().Milliseconds())
 				nextTick := timeNow.Add(resrv.Delay()).UnixNano()
 				c.nextTick = nextTick
-				w.Timer.PushTaskAndTick(&engine.Task{
-					TimeStamp: nextTick,
-					Event: engine.Event{
-						Type:      2,
-						Ident:     c.Fd,
-						Ev:        engine.InEventRaw,
-						TimeStamp: nextTick,
-						Flag:      c.flag,
-					},
-				})
+				w.triggerLater(c.Fd, engine.InEventRaw, c.flag, engine.EV_TYPE_TIMER_DELY, nextTick)
 				return
 			}
 			if loopCt == w.maxReadLoop {
@@ -381,16 +346,7 @@ func (w *Worker) handleReadEvent(ev engine.Event, timeNow time.Time, c *Conn) {
 				// nextTick := time.Now().UnixNano()
 				nextTick := timeNowUnixNano + 5
 				c.nextTick = nextTick
-				w.Timer.PushTaskAndTick(&engine.Task{
-					TimeStamp: nextTick,
-					Event: engine.Event{
-						Type:      2,
-						Ident:     c.Fd,
-						Ev:        engine.InEventRaw,
-						TimeStamp: nextTick,
-						Flag:      c.flag,
-					},
-				})
+				w.triggerLater(c.Fd, engine.InEventRaw, c.flag, engine.EV_TYPE_TIMER_DELY, nextTick)
 			}
 		}
 
@@ -421,16 +377,7 @@ func (w *Worker) handleWriteEvent(ev engine.Event, timeNow time.Time, c *Conn) {
 				//what is the appriciate delay?
 				//1e3 = 1 microsecond
 				// util.Println("parttial write")
-				w.Timer.PushTaskAndTick(&engine.Task{
-					TimeStamp: timeNowUnixNano + 1e3,
-					Event: engine.Event{
-						Ident:     c.Fd,
-						Ev:        engine.OutEventRaw,
-						Type:      2,
-						TimeStamp: timeNowUnixNano + 1e3,
-						Flag:      c.flag,
-					},
-				})
+				w.triggerLater(c.Fd, engine.OutEventRaw, c.flag, engine.EV_TYPE_TIMER_DELY, timeNowUnixNano+1e3)
 			}
 		} else {
 			c.CurPos = 0
@@ -440,19 +387,27 @@ func (w *Worker) handleWriteEvent(ev engine.Event, timeNow time.Time, c *Conn) {
 			// wake peer to read
 			tn := time.Now().UnixNano()
 			c.PeerConn.nextTick = tn
-			w.Timer.PushTaskAndTick(&engine.Task{
-				TimeStamp: tn,
-				Event: engine.Event{
-					Ident:     c.PeerConn.Fd,
-					Ev:        engine.InEventRaw,
-					Type:      2,
-					TimeStamp: tn,
-					Flag:      c.PeerConn.flag,
-				},
-			})
+			w.triggerLater(c.PeerConn.Fd, engine.InEventRaw, c.PeerConn.flag, engine.EV_TYPE_TIMER_DELY, tn)
 		}
 
 	}
+}
+
+// triggerLater create a new task and push it to the running timer queue
+// and the task will be triggerd later when the time meets the "triggerAt"
+func (w *Worker) triggerLater(fd int, ev int, flag int64, triggerType int, triggerAt int64) *engine.Task {
+	task := &engine.Task{
+		TimeStamp: triggerAt,
+		Event: engine.Event{
+			Ident:     fd,
+			Ev:        ev,
+			Type:      triggerType,
+			TimeStamp: triggerAt,
+			Flag:      flag,
+		},
+	}
+	w.Timer.PushTaskAndTick(task)
+	return task
 }
 
 func (w *Worker) deleteTimeOutTask(c *Conn) {

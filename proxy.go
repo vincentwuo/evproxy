@@ -1,4 +1,4 @@
-package proxy
+package evproxy
 
 import (
 	"context"
@@ -348,7 +348,7 @@ func (p *Proxy) dialWorkLoop(ctx context.Context) {
 			timeOutTask := &engine.Task{
 				TimeStamp: timeStamp,
 				Event: engine.Event{
-					Type:      3,
+					Type:      engine.EV_TYPE_TIMEOUT,
 					TimeStamp: timeStamp,
 					Ident:     fd,
 					Ev:        engine.ErrEvents,

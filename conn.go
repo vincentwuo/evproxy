@@ -1,4 +1,4 @@
-package proxy
+package evproxy
 
 import (
 	"github.com/vincentwuo/evproxy/internal/engine"
