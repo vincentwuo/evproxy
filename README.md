@@ -86,11 +86,11 @@ Intel(R) Xeon(R) CPU           E5620  @ 2.40GH
 Proxy implementation using the go standard package.
 
 ```go
-#example
+//example
 {
 	listener,_:= net.Listen(addr)
 	for{
-		conn, _:= listener.Accept()
+	    conn, _:= listener.Accept()
 		handle(conn)
 	}
 }
@@ -102,17 +102,17 @@ func handle(conn net.Conn){
 	//use buffer from the buffer pool
 	//usually we allocate a 16KB buf for each read and write
 	//the problem is when the connection is idle, there is no way 
-  //to reuse these bufs, which leads to non-trivial memory consumption
-  //when the number of connections is large.
+    //to reuse these bufs, which leads to non-trivial memory consumption
+    //when the number of connections is large.
 	//i.e, 100k conncetion = 100k * (8k from 2 gorutines + 32KB buf) = 3.8GB  
 	readBuf := pool.Get()
 	writeBuf := pool.Get()
 	for{
 		trafficShaper(upstreamConn, conn, readBuf)
-	  go trafficShaper(conn, upstreamConn, writeBuf)
+	    go trafficShaper(conn, upstreamConn, writeBuf)
 	}
-  pool.Put(readBuf)
-  pool.Put(writeBuf)
+    pool.Put(readBuf)
+    pool.Put(writeBuf)
 }
 
 ```
