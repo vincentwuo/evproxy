@@ -80,16 +80,6 @@ const (
 	EV_WRITE = ErrEvents | unix.EPOLLOUT
 )
 
-// // event represent a file descriptor event
-// type Event struct {
-// 	Ident     int // identifier of this event, usually file descriptor
-// 	Ev        int // event mark
-// 	Type      int // 1 epoll 2 timer
-// 	TimeStamp int64
-// 	Flag      int64
-// 	//might need some padding to improve the performance
-// }
-
 type Poller struct {
 	cpuid int32
 	// poolGeneric
@@ -295,13 +285,6 @@ func (p *Poller) Wait(chEventNotify chan Event) {
 		p.efd = -1
 		p.mu.Unlock()
 	}()
-
-	const (
-		rdhub = syscall.EPOLLRDHUP
-		rSet  = syscall.EPOLLIN
-		wSet  = syscall.EPOLLOUT
-	)
-
 	// epoll eventloop
 	for {
 		select {

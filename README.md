@@ -1,6 +1,20 @@
 ## Introduction
 
 Evproxy is a simple high performance TCP(UDP not supported yet ) proxy based on epoll, which aims to adress the high memory usage problem under high concurrent connections(>100k) when the proxy is implemented in the GO stdnet*. It supports basic source IP hash load balancing, read/write timeout, and bandwidth speed limiting.
+   
+## Features
+
+- [x]  ~8x less memory usage compared to the go stdnet when connections > 100k.
+- [x]  TCP support
+- [x]  Source IP hash load balancing
+- [x]  Basic connection and traffic statistics
+- [ ]  UDP support
+- [ ]  TLS support
+- [ ]  Proxy protocol support
+
+## Usage
+
+
 
 ## Benchmark
 
@@ -67,19 +81,6 @@ Intel(R) Xeon(R) CPU           E5620  @ 2.40GH
     ```
     
     Evproxy shows better memory and cpu utilization when the number of connections is 200K. 
-    
-
-## Features
-
-- [x]  ~8x less memory usage compared to the go stdnet when connections > 100k.
-- [x]  TCP support
-- [x]  Source IP hash load balancing
-- [x]  Basic connection and traffic statistics
-- [ ]  UDP support
-- [ ]  TLS support
-- [ ]  Proxy protocol support
-
-## Usage
 
 ## Go stdnet proxy
 
@@ -95,13 +96,14 @@ Proxy implementation using the go standard package.
 	}
 }
 
-func trafficShaper(dst, src net.Conn, buf []byte)
+//copy and traffic shaping
+func copy(dst, src net.Conn, buf []byte)
 
 func handle(conn net.Conn){
     upstreamConn,_ := net.Dial(upstreamAddr)
     
     //use buffer from the buffer pool
-	//usually we allocate a 16KB buf for each read and write
+	  //usually we allocate a 16KB buf for each read and write
     //the problem is when the connection is idle, there is no way
     //to reuse these bufs, which leads to non-trivial memory consumption
     //when the number of connections is large.
@@ -110,8 +112,8 @@ func handle(conn net.Conn){
 	writeBuf := pool.Get()
 
 	for{
-	    trafficShaper(upstreamConn, conn, readBuf)
-        go trafficShaper(conn, upstreamConn, writeBuf)
+	    copy(upstreamConn, conn, readBuf)
+      go copy(conn, upstreamConn, writeBuf)
 	}
     
     pool.Put(readBuf)

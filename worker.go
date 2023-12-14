@@ -56,29 +56,6 @@ func NewWorkers(num int, bufferSize int, maxReadLoop int) []*Worker {
 }
 
 func (w *Worker) Run() {
-
-	// go func() {
-	// 	for {
-	// 		count := w.conns.Count()
-	// 		if count <= 30 {
-	// 			str := ""
-	// 			ct := 0
-	// 			w.conns.Range(func(key int, value *Conn) (stop bool) {
-	// 				ct++
-	// 				str += fmt.Sprint(" fd:", key, "->", value.PeerConn.Fd, " isReady: ", value.ready, " isUpstream: ", value.Upstream, " isHup: ", value.isHup, " radadr", value.RemoteAddr, "/")
-	// 				if ct > 10 {
-	// 					return true
-	// 				}
-	// 				return false
-	// 			})
-	// 			fmt.Println("worker", w.ID, "conn num:", count, str)
-	// 		} else {
-	// 			fmt.Println("worker", w.ID, "conn num:", count)
-	// 		}
-
-	// 		time.Sleep(3 * time.Second)
-	// 	}
-	// }()
 	go w.poller.Wait(w.notify)
 	go w.Timer.Ticking(w.notify)
 
@@ -112,14 +89,6 @@ mainLoop:
 					}
 
 				}
-				// fmt.Println("hup", ev.Ev&engine.InEventRaw, ev.Ev&engine.OutEventRaw)
-				// if !c.Upstream && !c.ready {
-				// 	//close all
-				// 	// fmt.Println("source closed -> close all")
-				// 	w.CloseCP(c)
-				// 	continue
-				// }
-				// util.Println(c.Fd, "-", c.PeerConn.Fd, c.RemoteAddr, "meets hup", ev.Ev)
 
 			}
 		} else {
@@ -151,7 +120,6 @@ mainLoop:
 					c.ready = true
 					c.PeerConn.ready = true
 					w.deleteTimeOutTask(c.PeerConn)
-
 					//push a peerconn read event in the next loop
 					w.triggerLater(c.PeerConn.Fd, engine.InEventRaw, c.PeerConn.flag, engine.EV_TYPE_TIMER_DELY, timeNowUnixNano)
 
@@ -239,15 +207,6 @@ func (w *Worker) handleReadEvent(ev engine.Event, timeNow time.Time, c *Conn) {
 					// util.Println(c.Fd, "close all from detecting peerconn is hup")
 					w.ClosePair(c)
 				}
-				// w.tq.PushTaskAndTick(&engine.Task{
-				// 	TimeStamp: timeNowUnixNano,
-				// 	Event: engine.Event{
-				// 		Ident: c.PeerConn.Fd,
-				// 		Ev:    engine.OutEventRaw,
-				// 		Type:  2,
-				// 	},
-				// })
-				// tq.Tick()
 				return
 			}
 			n, _ := syscall.Read(ev.Ident, w.localBuffer[0:])
@@ -289,7 +248,6 @@ func (w *Worker) handleReadEvent(ev engine.Event, timeNow time.Time, c *Conn) {
 			} else if wn == -1 {
 				//eagain
 				if c.PeerConn.Buffer == nil {
-
 					buffer := w.bf.Get()
 					cn := copy(*buffer, w.localBuffer[:n])
 					c.PeerConn.Buffer = buffer
@@ -297,23 +255,7 @@ func (w *Worker) handleReadEvent(ev engine.Event, timeNow time.Time, c *Conn) {
 					c.PeerConn.EndPos = cn
 					util.Println("wn is -1,add to buff", cn)
 				}
-				// if c.PeerConn.isHup {
-				// 	// util.Println("close all from write n=-1 hup is true")
-				// 	// CloseAll(c, conns, epoll, bf)
-				// 	break rwLoop
-				// } else {
-				// 	//put the data to it's buffer
-				// 	if c.PeerConn.Buffer == nil {
-				// 		buffer := bf.Get()
-				// 		cn := copy(*buffer, localBuf[:n])
-				// 		c.PeerConn.Buffer = buffer
-				// 		c.PeerConn.CurPos = 0
-				// 		c.PeerConn.EndPos = cn
-				// 	} else {
-				// 		panic("wtf")
-				// 	}
 
-				// }
 			} else if wn < n {
 				if c.PeerConn.Buffer == nil {
 					buffer := w.bf.Get()
@@ -358,11 +300,6 @@ func (w *Worker) handleWriteEvent(ev engine.Event, timeNow time.Time, c *Conn) {
 	if c.Buffer != nil && c.EndPos > 0 {
 		wn, _ := syscall.Write(c.Fd, (*c.Buffer)[c.CurPos:c.EndPos])
 		// util.Println("buffer is full, so try writing out", wn)
-		// if wn >= 0 {
-		// 	// *wcount += wn
-		// 	// util.Println("writable wcount:", wcount)
-		// }
-		// util.Println("write n:", wn, "total", wcount)
 		if wn < c.EndPos-c.CurPos {
 			if wn == 0 {
 				// util.Println("close all from write, wn = 0 hup", c.isHup)
