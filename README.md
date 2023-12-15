@@ -7,12 +7,21 @@ Evproxy is a simple high performance TCP(UDP not supported yet ) proxy based on 
 - [x]  ~8x less memory usage compared to the go stdnet when connections > 100k.
 - [x]  TCP support
 - [x]  Source IP hash load balancing
-- [x]  Basic connection and traffic statistics
+- [ ]  Basic connection and traffic statistics
 - [ ]  UDP support
 - [ ]  TLS support
 - [ ]  Proxy protocol support
 
-## Usage
+## Build
+
+  ```bash
+  go install 
+  ```
+
+## Download
+
+
+## Quick start
 
 
 
