@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"evproxy"
-	"evproxy/pkg/util"
+	"github.com/vincentwuo/evproxy"
+	"github.com/vincentwuo/evproxy/pkg/util"
 
 	"github.com/spf13/viper"
 )
