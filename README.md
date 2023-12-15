@@ -1,6 +1,6 @@
 ## Introduction
 
-Evproxy is a simple high performance TCP(UDP not supported yet ) proxy based on epoll, which aims to adress the high memory usage problem under high concurrent connections(>100k) when the proxy is implemented in the GO stdnet*. It supports basic source IP hash load balancing, read/write timeout, and bandwidth speed limiting.
+Evproxy is a simple high performance TCP(UDP not supported yet ) proxy based on epoll(current linux only), which aims to adress the high memory usage problem under high concurrent connections(>100k) when the proxy is implemented in the GO stdnet*. It supports basic source IP hash load balancing, read/write timeout, and bandwidth speed limiting.
    
 ## Features
 
@@ -15,15 +15,87 @@ Evproxy is a simple high performance TCP(UDP not supported yet ) proxy based on 
 ## Build
 
   ```bash
-  go install 
+  go install github.com/vincentwuo/evproxy/cmd/evproxy@latest
   ```
 
 ## Download
-
+Please check releases.
 
 ## Quick start
+Create a simple tcp proxy
 
+```bash
+#example
+#simple
+evproxy -bind 10.0.1.3:5201 -upstreams 10.0.1.4:5201
 
+#load balance
+evproxy -bind 10.0.1.3:5201 -upstreams 10.0.1.4:5201,10.0.1.5:5201
+
+#help
+evproxy -h
+	-type string
+        proxy type, defaut:tcp (default "tcp")
+	-bind string
+        addr to accept downstream data. Example: 0.0.0.0:8890 
+  -c int
+        cocurrent limit. '0' means no limit
+  -check int
+        (unit:second) the interval to check whether the unreachable upstream endpoint is back online or not (default 30)
+  -dtimeout int
+        (unit:second) the timeout when dialing to the upstream (default 15)
+  -f string
+        config file dir.
+  -n int
+        the number of workers to handlle the data transfer. default 0 will set it to the number of CPU cores
+  -rmbps int
+        mbyte per second for reading from the downstream. '0.0' means no limit
+  -upstreams string
+        upstream addrs define where the data will be transfer to , need to be splited by comma. Example: 1.1.1.1:123, 2.2.2.2:123
+  -wmbps int
+        mbyte per second for reading from the upstream. '0.0' means no limit
+  -wtimeout int
+        (unit:second) the timeout for the write operation when one of the peer is closed. (default 30)
+```
+
+Create with JSON config file
+
+```bash
+evproxy -f path/to/config.json
+```
+
+Config file example
+
+```json
+{
+    "workernum": 16,
+    "proxyconfig": [
+        {
+            "type": "tcp",
+            "bindaddr": "10.0.1.3:8080",
+            "upstreamaddrs": "10.0.1.4:8080,10.0.1.5:8080",
+            "upstreamcheckinterval": 30,
+            "concurrentlimit": 10000,
+            "readspeed": 10,
+            "writespeed": 10,
+            "dialtimeout": 60,
+            "writetimeout":60
+        },
+        {
+            "type": "tcp",
+            "bindaddr": "10.0.1.3:8081",
+            "upstreamaddrs": "10.0.1.14:8081",
+            "upstreamcheckinterval": 30,
+            "concurrentlimit": 10000,
+            "readspeed": 10,
+            "writespeed": 10,
+            "dialtimeout": 60,
+            "writetimeout":60
+        }
+        
+    ]
+}
+```
 
 ## Benchmark
 

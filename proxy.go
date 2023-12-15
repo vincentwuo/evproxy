@@ -439,6 +439,10 @@ func (p *Proxy) SetBandLimitNumber(readFromDownStream, readFromUpStream float64)
 	p.upRLimit = readFromUpStream
 }
 
+func (p *Proxy) Local() string {
+	return p.laddr
+}
+
 func (p *Proxy) Remotes() []string {
 	return p.remotes
 }

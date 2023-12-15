@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/vincentwuo/evproxy"
-	"github.com/vincentwuo/evproxy/pkg/util"
+	"evproxy"
+	"evproxy/pkg/util"
 
 	"github.com/spf13/viper"
 )
@@ -25,6 +25,7 @@ type config struct {
 	ProxyConfig []proxyConfig
 }
 type proxyConfig struct {
+	Type                  string
 	BindAddr              string
 	UpstreamAddrs         string
 	UpstreamCheckInterval int
@@ -36,6 +37,7 @@ type proxyConfig struct {
 }
 
 var (
+	proxyType             = flag.String("type", "tcp", "proxy type, defaut:tcp")
 	wokerNum              = flag.Int("n", 0, "the number of workers to handlle the data transfer. default 0 will set it to the number of CPU cores")
 	bindAddr              = flag.String("bind", "", "addr to accept downstream data. Example: 0.0.0.0:8890 ")
 	upstreamAddrs         = flag.String("upstreams", "", "upstream addrs define where the data will be transfer to , need to be splited by comma. Example: 1.1.1.1:123, 2.2.2.2:123")
@@ -76,7 +78,7 @@ func main() {
 		}
 
 		for _, proxyCnf := range fileConfig.ProxyConfig {
-			p, err := setProxy(workers, proxyCnf.BindAddr, proxyCnf.UpstreamAddrs, proxyCnf.ConcurrentLimit, proxyCnf.ReadSpeed, proxyCnf.WriteSpeed, proxyCnf.DialTimeout, proxyCnf.WriteTimeout)
+			p, err := setProxy(workers, proxyCnf.Type, proxyCnf.BindAddr, proxyCnf.UpstreamAddrs, proxyCnf.ConcurrentLimit, proxyCnf.ReadSpeed, proxyCnf.WriteSpeed, proxyCnf.DialTimeout, proxyCnf.WriteTimeout)
 			if err != nil {
 				util.Logger().Fatal("create proxy error: " + err.Error())
 			}
@@ -93,7 +95,7 @@ func main() {
 			go workers[i].Run()
 		}
 
-		p, err := setProxy(workers, *bindAddr, *upstreamAddrs, *concurrentLimit, *readSpeed, *writeSpeed, *dialTimeout, *writeTimeout)
+		p, err := setProxy(workers, *proxyType, *bindAddr, *upstreamAddrs, *concurrentLimit, *readSpeed, *writeSpeed, *dialTimeout, *writeTimeout)
 		if err != nil {
 			util.Logger().Fatal("create proxy error: " + err.Error())
 		}
@@ -102,13 +104,13 @@ func main() {
 	}
 
 	for i := range proxies {
-		util.Logger().Sugar().Info("proxy idx: ", i, " is running")
+		util.Logger().Sugar().Info("proxy: ", proxies[i].Local(), " is running")
 		go proxies[i].Accepting()
 	}
 
 	defer func() {
 		for i := range proxies {
-			util.Logger().Sugar().Info("closing proxy...idx: ", i)
+			util.Logger().Sugar().Info("closing proxy...: ", proxies[i].Local())
 			proxies[i].Close()
 		}
 	}()
@@ -116,7 +118,11 @@ func main() {
 	<-ctrlc
 }
 
-func setProxy(workers []*evproxy.Worker, bindAddr, upstreamAddrs string, concurrentLimit int64, readSpeed, writeSpeed, dialTimeout, writeTimeout int) (*evproxy.Proxy, error) {
+func setProxy(workers []*evproxy.Worker, proxyType, bindAddr, upstreamAddrs string, concurrentLimit int64, readSpeed, writeSpeed, dialTimeout, writeTimeout int) (*evproxy.Proxy, error) {
+	if proxyType != "tcp" {
+		return nil, errors.New("proxy currently dosen't support type:" + proxyType)
+	}
+
 	if bindAddr == "" {
 		return nil, errors.New("bind addr is empty")
 	}
